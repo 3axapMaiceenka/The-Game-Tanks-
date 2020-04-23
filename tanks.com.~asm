@@ -90,8 +90,6 @@ pop player_frame
 pop player_y
 pop player_x
 
-call check_for_bonus
-
 call update_shots
 cmp game_over, 1
 je main_return
@@ -100,7 +98,6 @@ call update_enemies
 
 call print_map
 call print_hq
-call print_bonus
 
 mov ah, 0Ah ; load attribute
 push player_x
@@ -900,92 +897,6 @@ check_for_shot_collision endp
 
 ;**********************************************************************************************************
 
-proc check_for_bonus
-mov ax, bonus_x
-mov dx, bonus_y
-
-cmp ax, player_x
-jl no_bonus
-sub ax, tank_size
-cmp ax, player_x
-jge no_bonus
-cmp dx, player_y
-jl no_bonus
-sub dx, tank_size
-cmp dx, player_y
-jge no_bonus
-call apply_bonus
-
-no_bonus:
-ret
-check_for_bonus endp
-
-;**********************************************************************************************************
-
-proc apply_bonus
-mov bx, cur_bonus
-
-cmp cur_bonus, 0
-je limit_player_shots
-cmp cur_bonus, 1
-je decrease_enemies
-
-increase_enemies:
-inc min_enemies_count
-jmp generate_new_bonus
-decrease_enemies:
-mov min_enemies_count, 2
-jmp generate_new_bonus
-limit_player_shots:
-mov max_player_shots, 1
-
-generate_new_bonus:
-call generate_bonus
-
-ret
-endp apply_bonus
-
-;**********************************************************************************************************
-
-;assume that former bonus index is in bx
-proc generate_bonus
-mov dx, seconds
-and dx, 1111b
-cmp dx, 4
-jl second_bonus
-cmp dx, 8
-jl first_bonus
-
-third_bonus:
-mov cur_bonus, 2
-jmp set_bonus_pos
-second_bonus:
-mov cur_bonus, 1
-jmp set_bonus_pos
-first_bonus:
-mov cur_bonus, 0
-
-set_bonus_pos:
-inc bx
-cmp bx, 3
-jl correct_pos
-mov bx, 0
-correct_pos:
-mov ax, bx
-mov bx, 2
-mul bx
-mov bx, ax
-shl bx, 1
-mov dx, bonus_positions[bx + 2]
-mov bonus_x, dx
-mov dx, bonus_positions[bx]
-mov bonus_y, dx
-
-ret
-endp generate_bonus
-
-;**********************************************************************************************************
-
 ;check on collisions, return 1 in ax if movement is possible, arguments: [bp + 4] = frame number; [bp + 6] = y; [bp + 8] = x
 proc is_movement_possible
 push bp
@@ -1384,17 +1295,9 @@ jl update_time_return
 
 inc adding_delay_timer
 cmp adding_delay_timer, delay_to_add_enemy
-jl update_bonus_change_timer
+jl set_shooting_delays
 mov allow_to_add_enemy, 1
 mov adding_delay_timer, 0
-
-update_bonus_change_timer:
-inc bonus_change_timer
-cmp bonus_change_timer, bonus_change_delay
-jl set_shooting_delays
-mov bx, cur_bonus
-call generate_bonus
-mov bonus_change_timer, 0
 
 set_shooting_delays:
 mov player_delay, 1
@@ -1506,21 +1409,6 @@ stosw
 ret
 print_hq endp
 
-;**********************************************************************************************************
-
-proc print_bonus
-mov ax, bonus_y
-mov bx, 80
-mul bx
-add ax, bonus_x
-shl ax, 1
-mov di, ax
-mov bx, cur_bonus
-mov ax, bonuses[bx]
-stosw
-ret
-print_bonus endp
-
 ;DATA **********************************************************************************************************
 
 tank_size           equ 3
@@ -1577,14 +1465,6 @@ new_enemy_x         dw 23
 new_enemy_y         dw 2
 new_enemy_dir       dw left
 
-bonuses             dw 09b2h, 0bb2h, 0db2h
-cur_bonus           dw 0
-bonus_x             dw 73
-bonus_y             dw 1
-bonus_positions     dw 1, 73, 2, 2, 23, 2
-bonus_change_timer  dw 0
-bonus_change_delay  equ 12
-
 frame1 db ' ',  0b1h,  ' ',  ; #
 db 0b1h, 0b1h, 0b1h   ;###
 db 0b1h, 0b1h, 0b1h   ;###
@@ -1604,14 +1484,14 @@ db ' ',  0b1h, 0b1h   ; ##
 frames dw frame1, frame2, frame3, frame4
 
 map    db '################################################################################'
-db '#                                                   #                          #'
-db '#                                                   #                          #'
-db '#                                                   #                          #'
-db '#            #                  #                   #                          #'
-db '#            #                  #                   #                          #'
-db '#            #                  #                   #                          #'
-db '#            #                                      #                          #'
-db '#            #                                      #                          #'
+db '#                                                                              #'
+db '#                                                                              #'
+db '#                                                                              #'
+db '#            #                  #                                              #'
+db '#            #                  #                                              #'
+db '#            #                  #                                              #'
+db '#            #                                                                 #'
+db '#            #                                                                 #'
 db '#            #                                                                 #'
 db '#            #                  #                                              #'
 db '#                               #                                              #'
@@ -1619,9 +1499,9 @@ db '#                               #                                           
 db '#                                                                              #'
 db '#            #                                                                 #'
 db '#            #                                                                 #'
-db '#            #                                                                 #'
-db '#                                                                              #'
-db '#                                   #########        #########                 #'
+db '#            #                  #                                              #'
+db '#                               #                                              #'
+db '#                                   #########        ###########################'
 db '#                                                                              #'
 db '#                                                                              #'
 db '#                                                                              #'
@@ -1642,4 +1522,4 @@ end main
 
 
 
-; [SOURCE]: D:\computer science\assembly\Tanks\tanks.asm
+; [SOURCE]: D:\computer science\assembly\Tanks\src\tanks.asm
